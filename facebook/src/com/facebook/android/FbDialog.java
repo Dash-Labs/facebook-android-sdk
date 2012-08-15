@@ -25,7 +25,6 @@ import android.graphics.Color;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Bundle;
-import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewGroup.LayoutParams;
@@ -57,6 +56,8 @@ public class FbDialog extends Dialog {
     private ImageView mCrossImage;
     private WebView mWebView;
     private FrameLayout mContent;
+    private Bundle loginValues;
+    private boolean detached = false;
 
     public FbDialog(Context context, String url, DialogListener listener) {
         super(context, android.R.style.Theme_Translucent_NoTitleBar);
@@ -64,9 +65,27 @@ public class FbDialog extends Dialog {
         mListener = listener;
     }
 
+    @Override public void onDetachedFromWindow() {
+        detached = true;
+        super.onDetachedFromWindow();
+    }
+
+    @Override public void dismiss() {
+        if (!detached) {
+            super.dismiss();
+        }
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        if (savedInstanceState != null) {
+            handleLoginValues();
+            dismiss();
+            return;
+        }
+
         mSpinner = new ProgressDialog(getContext());
         mSpinner.requestWindowFeature(Window.FEATURE_NO_TITLE);
         mSpinner.setMessage("Loading...");
@@ -92,7 +111,14 @@ public class FbDialog extends Dialog {
         mContent.addView(mCrossImage, new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
         addContentView(mContent, new LayoutParams(LayoutParams.FILL_PARENT, LayoutParams.FILL_PARENT));
     }
-    
+
+    @Override public Bundle onSaveInstanceState() {
+        if (loginValues != null) {
+            return loginValues;
+        }
+        return super.onSaveInstanceState();
+    }
+
     private void createCrossImage() {
         mCrossImage = new ImageView(getContext());
         // Dismiss the dialog when user click on the 'x'
@@ -128,27 +154,31 @@ public class FbDialog extends Dialog {
         mContent.addView(webViewContainer);
     }
 
+    private void handleLoginValues() {
+        String error = loginValues.getString("error");
+        if (error == null) {
+            error = loginValues.getString("error_type");
+        }
+
+        if (error == null) {
+            mListener.onComplete(loginValues);
+        } else if (error.equals("access_denied") ||
+                error.equals("OAuthAccessDeniedException")) {
+            mListener.onCancel();
+        } else {
+            mListener.onFacebookError(new FacebookError(error));
+        }
+    }
+
     private class FbWebViewClient extends WebViewClient {
 
         @Override
         public boolean shouldOverrideUrlLoading(WebView view, String url) {
             Util.logd("Facebook-WebView", "Redirect URL: " + url);
             if (url.startsWith(Facebook.REDIRECT_URI)) {
-                Bundle values = Util.parseUrl(url);
+                loginValues = Util.parseUrl(url);
 
-                String error = values.getString("error");
-                if (error == null) {
-                    error = values.getString("error_type");
-                }
-
-                if (error == null) {
-                    mListener.onComplete(values);
-                } else if (error.equals("access_denied") ||
-                           error.equals("OAuthAccessDeniedException")) {
-                    mListener.onCancel();
-                } else {
-                    mListener.onFacebookError(new FacebookError(error));
-                }
+                handleLoginValues();
 
                 FbDialog.this.dismiss();
                 return true;
@@ -178,13 +208,17 @@ public class FbDialog extends Dialog {
         public void onPageStarted(WebView view, String url, Bitmap favicon) {
             Util.logd("Facebook-WebView", "Webview loading URL: " + url);
             super.onPageStarted(view, url, favicon);
-            mSpinner.show();
+            if (!detached) {
+                mSpinner.show();
+            }
         }
 
         @Override
         public void onPageFinished(WebView view, String url) {
             super.onPageFinished(view, url);
-            mSpinner.dismiss();
+            if (!detached) {
+                mSpinner.dismiss();
+            }
             /* 
              * Once webview is fully loaded, set the mContent background to be transparent
              * and make visible the 'x' image. 
