@@ -39,6 +39,8 @@ import android.os.Message;
 import android.os.Messenger;
 import android.os.RemoteException;
 import android.text.TextUtils;
+import android.util.Log;
+import android.webkit.CookieManager;
 import android.webkit.CookieSyncManager;
 
 /**
@@ -62,13 +64,13 @@ public class Facebook {
 
     public static final int FORCE_DIALOG_AUTH = -1;
 
-    private static final String LOGIN = "oauth";
+    public static final String LOGIN = "oauth";
 
     // Used as default activityCode by authorize(). See authorize() below.
     private static final int DEFAULT_AUTH_ACTIVITY_CODE = 32665;
 
     // Facebook server endpoints: may be modified in a subclass for testing
-    protected static String DIALOG_BASE_URL =
+    public static String DIALOG_BASE_URL =
         "https://m.facebook.com/dialog/";
     protected static String GRAPH_BASE_URL =
         "https://graph.facebook.com/";
@@ -806,6 +808,7 @@ public class Facebook {
             parameters.putString(TOKEN, getAccessToken());
         }
         String url = endpoint + "?" + Util.encodeUrl(parameters);
+        Log.i("Dash.Facebook", String.format("Facebook post url: %s", url));
         if (context.checkCallingOrSelfPermission(Manifest.permission.INTERNET)
                 != PackageManager.PERMISSION_GRANTED) {
             Util.showAlert(context, "Error",

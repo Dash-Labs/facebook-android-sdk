@@ -57,23 +57,11 @@ public class FbDialog extends Dialog {
     private WebView mWebView;
     private FrameLayout mContent;
     private Bundle loginValues;
-    private boolean detached = false;
 
     public FbDialog(Context context, String url, DialogListener listener) {
         super(context, android.R.style.Theme_Translucent_NoTitleBar);
         mUrl = url;
         mListener = listener;
-    }
-
-    @Override public void onDetachedFromWindow() {
-        detached = true;
-        super.onDetachedFromWindow();
-    }
-
-    @Override public void dismiss() {
-        if (!detached) {
-            super.dismiss();
-        }
     }
 
     @Override
@@ -208,7 +196,7 @@ public class FbDialog extends Dialog {
         public void onPageStarted(WebView view, String url, Bitmap favicon) {
             Util.logd("Facebook-WebView", "Webview loading URL: " + url);
             super.onPageStarted(view, url, favicon);
-            if (!detached) {
+            if (!mSpinner.isShowing()) {
                 mSpinner.show();
             }
         }
@@ -216,10 +204,14 @@ public class FbDialog extends Dialog {
         @Override
         public void onPageFinished(WebView view, String url) {
             super.onPageFinished(view, url);
-            if (!detached) {
-                mSpinner.dismiss();
+            if (mSpinner.isShowing()) {
+                try {
+                    mSpinner.dismiss();
+                } catch (Exception e) {
+                    // ignore, closing dialog
+                }
             }
-            /* 
+            /*
              * Once webview is fully loaded, set the mContent background to be transparent
              * and make visible the 'x' image. 
              */
@@ -227,5 +219,6 @@ public class FbDialog extends Dialog {
             mWebView.setVisibility(View.VISIBLE);
             mCrossImage.setVisibility(View.VISIBLE);
         }
+
     }
 }
